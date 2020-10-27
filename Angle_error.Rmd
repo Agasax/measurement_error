@@ -1,0 +1,172 @@
+---
+title: "Angle error"
+author: "Lars Mølgaard Saxhaug"
+date: "10/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggstatsplot)
+library(dagitty)
+```
+
+## Completely correlated 
+```{r,echo=FALSE}
+dag1 <- dagitty('dag {
+  x [pos="0,1"]
+  TAPSE [pos="1,0"]
+  S [pos="1,2"]
+
+  x-> TAPSE
+  x-> S
+}')
+plot(dag1)
+```
+
+
+```{r}
+
+x <- rnorm(1e3, 10, 2) # Common determinant of TAPSE and S
+raw <- tibble(tapse = 2*x, s = 0.6 * x, type = "raw")
+summary(lm(s~tapse,raw))
+ggscatterstats(raw, tapse, s, marginal = FALSE, method = "lm", type = "parametric", bf.message = FALSE)
+
+
+
+```
+
+## Adding random error
+```{r, echo=FALSE}
+dag2 <- dagitty('dag {
+  x [pos="0,1"]
+  TAPSE [pos="1,0"]
+  S [pos="1,2"]
+  reTAPSE [pos="2,0"]
+  reS [pos="2,2"]
+  x-> TAPSE
+  x-> S
+  reTAPSE->TAPSE
+  reS->S
+}')
+plot(dag2)
+```
+
+
+```{r}
+tapse <- rnorm(1e3, 2*x, 1)
+s <- rnorm(1e3, 0.2 * x, 0.3)
+
+random_error <- tibble(tapse, s)
+summary(lm(s ~ tapse, random_error))
+ggscatterstats(random_error, tapse, s, marginal = FALSE, method = "lm", type = "parametric", bf.message = FALSE)
+```
+
+## Adding angle error
+```{r, echo=FALSE}
+dag3 <- dagitty('dag {
+  x [pos="0,1"]
+  TAPSE [pos="1,0"]
+  S [pos="1,2"]
+  rrTAPSE [pos="2,0"]
+  rrS [pos="2,2"]
+  ar [pos="1,1"]
+  x-> TAPSE
+  x-> S
+  rrTAPSE->TAPSE
+  rrS->S
+  TAPSE <- ar -> S
+}')
+plot(dag3)
+```
+
+
+```{r}
+angle_error <- runif(1e3, 0, pi / 4) # angle error from 0 to 45 degrees,
+tapse_ra <- tapse / cos(angle_error)
+s_ra <- s * cos(angle_error)
+random_plus_angle <- tibble(tapse = tapse_ra, s = s_ra)
+
+summary(lm(s ~ tapse, random_plus_angle))
+```
+
+
+```{r,echo=FALSE}
+ggscatterstats(random_plus_angle, tapse, s, marginal = FALSE, method = "lm", type = "parametric", bf.message = FALSE)
+```
+
+## Adding positively correlated error with
+```{r, echo=FALSE}
+dag4 <- dagitty('dag {
+  x [pos="0,1"]
+  TAPSE [pos="1,0"]
+  MAPSE [pos="1,2"]
+  rrTAPSE [pos="2,0"]
+  rrMAPSE [pos="2,2"]
+  ar [pos="1,1"]
+  x-> TAPSE
+  x-> MAPSE
+  rrTAPSE->TAPSE
+  rrMAPSE->MAPSE
+  TAPSE <- ar -> MAPSE
+}')
+plot(dag4)
+```
+
+
+## Completely independent TAPSE and S, with random uncorrelated error
+```{r, echo=FALSE}
+dag5 <- dagitty('dag {
+  TAPSE [pos="0,1"]
+  S [pos="0,0"]
+  reTAPSE [pos="1,1"]
+  reS [pos="1,0"]
+  reTAPSE->TAPSE
+  reS->S
+}')
+plot(dag5)
+```
+
+
+```{r}
+tapse_unc <- rnorm(1e3,17,1)
+s_unc <- rnorm(1e3,2,0.3)
+uncorrelated <- tibble(tapse=tapse_unc,s=s_unc)
+
+summary(lm(s ~ tapse,uncorrelated))
+```
+
+
+```{r,echo=FALSE}
+ggscatterstats(uncorrelated,tapse,s,marginal = FALSE,method = "lm",type = "parametric",bf.message = FALSE)
+
+
+```
+
+## Adding angle deviation, as correlated error
+```{r, echo=FALSE}
+dag5 <- dagitty('dag {
+  TAPSE [pos="1,0"]
+  S [pos="1,2"]
+  reTAPSE [pos="2,0"]
+  reS [pos="2,2"]
+  ar [pos="1,1"]
+  reTAPSE->TAPSE
+  reS->S
+  TAPSE <- ar -> S
+}')
+plot(dag5)
+```
+
+
+```{r}
+tapse_unc_a <- rnorm(1e3, 10, 1) / cos(angle_error)
+s_unc_a <- rnorm(1e3, 2, 0.3) * cos(angle_error)
+uncorrelated_plus_angle <- tibble(tapse = tapse_unc_a, s = s_unc_a)
+
+summary(lm(s ~ tapse, uncorrelated_plus_angle))
+
+ggscatterstats(uncorrelated_plus_angle, tapse, s, marginal = FALSE, method = "lm", type = "parametric", bf.message = FALSE)
+```
+
